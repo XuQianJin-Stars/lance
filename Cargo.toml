@@ -252,3 +252,10 @@ multiple-crate-versions = "allow"
 single_range_in_vec_init = "allow"
 large_futures = "deny"
 disallowed_macros = "deny"
+
+
+# Development patch: Use forked opendal with services-goosefs support
+# Remove this patch after opendal services-goosefs is published to crates.io
+[patch.crates-io]
+opendal = { git = "https://github.com/XuQianJin-Stars/opendal", branch = "add-goosefs-v0.55" }
+object_store_opendal = { git = "https://github.com/XuQianJin-Stars/opendal", branch = "add-goosefs-v0.55" }
