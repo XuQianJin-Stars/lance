@@ -120,7 +120,7 @@ geo-types = { workspace = true }
 datafusion-substrait = { workspace = true }
 
 [features]
-default = ["aws", "azure", "gcp", "oss", "huggingface", "tencent", "geo"]
+default = ["aws", "azure", "gcp", "oss", "huggingface", "tencent", "goosefs", "geo"]
 fp16kernels = ["lance-linalg/fp16kernels"]
 # Prevent dynamic linking of lzma, which comes from datafusion
 cli = ["dep:clap", "lzma-sys/static"]
@@ -138,6 +138,7 @@ gcp = ["lance-io/gcp"]
 azure = ["lance-io/azure"]
 oss = ["lance-io/oss"]
 tencent = ["lance-io/tencent"]
+goosefs = ["lance-io/goosefs"]
 huggingface = ["lance-io/huggingface"]
 geo = ["dep:lance-geo", "lance-geo/geo", "lance-datafusion/geo", "lance-index/geo"]
 # Enable slow integration tests (disabled by default in CI)

@@ -30,6 +30,7 @@ half = { version = "2.5", default-features = false, features = [
     "std",
 ] }
 lance = { path = "../rust/lance", features = [
+    "goosefs",
     "dynamodb",
     "substrait",
 ] }
@@ -45,7 +46,7 @@ lance-index = { path = "../rust/lance-index", features = [
 lance-io = { path = "../rust/lance-io" }
 lance-linalg = { path = "../rust/lance-linalg" }
 lance-namespace = { path = "../rust/lance-namespace" }
-lance-namespace-impls = { path = "../rust/lance-namespace-impls", features = ["rest", "rest-adapter"] }
+lance-namespace-impls = { path = "../rust/lance-namespace-impls", features = ["rest", "rest-adapter", "dir-goosefs"] }
 lance-table = { path = "../rust/lance-table" }
 lance-datafusion = { path = "../rust/lance-datafusion" }
 libc = "0.2.176"
@@ -94,3 +95,7 @@ incremental = false
 
 [lints.clippy]
 disallowed_macros = "deny"
+
+# Development patch: Use local opendal with services-goosefs support
+[patch.crates-io]
+opendal = { path = "/data/opendal/core" }
