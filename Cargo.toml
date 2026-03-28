@@ -248,3 +248,8 @@ multiple-crate-versions = "allow"
 single_range_in_vec_init = "allow"
 large_futures = "deny"
 disallowed_macros = "deny"
+
+# Development patch: Use local opendal with services-goosefs support
+# Remove this patch after opendal services-goosefs is published to crates.io
+[patch.crates-io]
+opendal = { path = "/opt/sourcecode/opendal-src/core" }

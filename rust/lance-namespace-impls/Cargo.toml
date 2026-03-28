@@ -21,6 +21,7 @@ dir-aws = ["lance-io/aws", "lance/aws"]
 dir-azure = ["lance-io/azure", "lance/azure"]
 dir-oss = ["lance-io/oss", "lance/oss"]
 dir-huggingface = ["lance-io/huggingface", "lance/huggingface"]
+dir-goosefs = ["lance-io/goosefs", "lance/goosefs"]
 # Credential vending features
 credential-vendor-aws = ["dep:aws-sdk-sts", "dep:aws-config", "dep:aws-credential-types", "dep:sha2", "dep:base64"]
 credential-vendor-gcp = ["dep:google-cloud-auth", "dep:reqwest", "dep:serde", "dep:sha2", "dep:base64"]
