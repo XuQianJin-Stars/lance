@@ -98,4 +98,4 @@ disallowed_macros = "deny"
 
 # Development patch: Use local opendal with services-goosefs support
 [patch.crates-io]
-opendal = { path = "/data/opendal/core" }
+opendal = { path = "/opt/sourcecode/opendal-src/core" }

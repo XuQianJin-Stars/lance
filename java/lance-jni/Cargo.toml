@@ -67,4 +67,4 @@ incremental = false
 disallowed_macros = "deny"
 
 [patch.crates-io]
-opendal = { path = "/data/opendal/core" }
+opendal = { path = "/opt/sourcecode/opendal-src/core" }
