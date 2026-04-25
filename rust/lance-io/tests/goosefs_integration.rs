@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 fn get_operator() -> Operator {
     let addr = std::env::var("GOOSEFS_MASTER_ADDR").unwrap_or("127.0.0.1:9200".into());
-    let auth_type = std::env::var("GOOSEFS_AUTH_TYPE").unwrap_or("nosasl".into());
+    let auth_type = std::env::var("GOOSEFS_AUTH_TYPE").unwrap_or("simple".into());
     let mut cfg = HashMap::new();
     cfg.insert("master_addr".to_string(), addr);
     cfg.insert("root".to_string(), "/lance-test/opendal".to_string());

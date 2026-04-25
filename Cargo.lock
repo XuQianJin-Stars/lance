@@ -5191,6 +5191,7 @@ name = "lance-namespace-impls"
 version = "5.0.0-beta.1"
 dependencies = [
  "arrow",
+ "arrow-array",
  "arrow-ipc",
  "arrow-schema",
  "async-trait",
@@ -5208,6 +5209,7 @@ dependencies = [
  "futures",
  "google-cloud-auth",
  "lance",
+ "lance-arrow",
  "lance-core",
  "lance-index",
  "lance-io",

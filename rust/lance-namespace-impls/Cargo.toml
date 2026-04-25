@@ -92,9 +92,12 @@ tokio = { workspace = true, features = ["full"] }
 tempfile.workspace = true
 wiremock.workspace = true
 arrow = { workspace = true }
+arrow-array = { workspace = true }
 arrow-ipc = { workspace = true }
 rstest.workspace = true
 lance-table.workspace = true
+lance-arrow = { workspace = true }
+lance = { workspace = true }
 
 [lints]
 workspace = true
