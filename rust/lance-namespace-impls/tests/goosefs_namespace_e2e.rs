@@ -1572,7 +1572,7 @@ async fn test_diag_opendal_direct_write() {
     // Test 1: Write a small file
     println!("[DIAG3] Writing test file...");
     match op.write("test.txt", "Hello from OpenDAL!").await {
-        Ok(()) => println!("[DIAG3] Write succeeded! ✅"),
+        Ok(_) => println!("[DIAG3] Write succeeded! ✅"),
         Err(e) => {
             println!("[DIAG3] Write FAILED: {:?}", e);
             return;
@@ -1583,7 +1583,8 @@ async fn test_diag_opendal_direct_write() {
     println!("[DIAG3] Reading test file...");
     match op.read("test.txt").await {
         Ok(data) => {
-            let content = String::from_utf8_lossy(&data.to_bytes());
+            let bytes = data.to_bytes();
+            let content = String::from_utf8_lossy(&bytes);
             println!("[DIAG3] Read content: {}", content);
             assert_eq!(content, "Hello from OpenDAL!");
         }
