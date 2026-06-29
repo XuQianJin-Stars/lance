@@ -2776,8 +2776,50 @@ impl LanceNamespace for DirectoryNamespace {
 
     async fn drop_table(&self, request: DropTableRequest) -> Result<DropTableResponse> {
         self.record_op("drop_table");
+        // For root-level tables with directory listing enabled (and migration
+        // disabled) the directory — not the `__manifest` table — is the source
+        // of truth, exactly as in `describe_table_impl`'s
+        // `skip_manifest_for_root`. Sibling operations (`describe_table`,
+        // `list_table_versions`, `create_table_version`) all resolve such
+        // tables via directory listing, so `drop_table` must do the same.
+        // Otherwise a root-level table the rest of the system can see fails to
+        // drop with a confusing `TableNotFound`, because the manifest-only drop
+        // never observes the directory-listed table.
+        let is_root_level = request.id.as_ref().is_some_and(|id| id.len() == 1);
+        let skip_manifest_for_root = self.dir_listing_enabled
+            && is_root_level
+            && !self.dir_listing_to_manifest_migration_enabled;
         if let Some(ref manifest_ns) = self.manifest_ns {
-            return manifest_ns.drop_table(request).await;
+            if !skip_manifest_for_root {
+                return manifest_ns.drop_table(request).await;
+            }
+            // Root-level dir-listing table: prefer the manifest drop, which
+            // also removes the physical directory. If the table is tracked in
+            // the manifest this fully handles the drop and we return early. If
+            // it is *not* tracked there (the directory-listing-only case that
+            // sibling read ops resolve via directory listing), the manifest
+            // drop reports `TableNotFound`; we then fall through to the
+            // directory-based drop below so the table can still be removed.
+            // Any other error (e.g. an incompatible manifest) is surfaced.
+            match manifest_ns.drop_table(request.clone()).await {
+                Ok(response) => return Ok(response),
+                Err(e) => {
+                    let is_table_not_found = matches!(
+                        &e,
+                        lance_core::Error::Namespace { source, .. }
+                            if source
+                                .downcast_ref::<NamespaceError>()
+                                .is_some_and(|ns_err| matches!(
+                                    ns_err,
+                                    NamespaceError::TableNotFound { .. }
+                                ))
+                    );
+                    if !is_table_not_found {
+                        return Err(e);
+                    }
+                    // Not in manifest: fall through to directory-based drop.
+                }
+            }
         }
 
         let table_name = Self::table_name_from_id(&request.id)?;
@@ -7065,6 +7107,52 @@ mod tests {
         assert!(response.location.is_some());
 
         // Verify it no longer exists
+        assert!(namespace.table_exists(exists_request).await.is_err());
+    }
+
+    // Regression for a root-level table that exists on disk (resolvable via
+    // directory listing) but has no `__manifest` row — the state produced when
+    // a dataset is written through the directory-listing path (e.g. pylance
+    // `write_dataset`). `describe_table` / `list_table_versions` /
+    // `create_table_version` all resolve such tables via directory listing, so
+    // `drop_table` must too; previously it went manifest-only and failed with a
+    // confusing `TableNotFound`.
+    #[tokio::test]
+    async fn test_drop_root_table_not_in_manifest() {
+        let temp_dir = TempStdDir::default();
+        let root = temp_dir.to_str().unwrap();
+
+        // Create the table WITHOUT a manifest entry (manifest disabled) so it
+        // exists only as a directory.
+        let dir_only_ns = DirectoryNamespaceBuilder::new(root)
+            .manifest_enabled(false)
+            .build()
+            .await
+            .unwrap();
+        let schema = create_test_schema();
+        let ipc_data = create_test_ipc_data(&schema);
+        let mut create_request = CreateTableRequest::new();
+        create_request.id = Some(vec!["dir_only_table".to_string()]);
+        dir_only_ns
+            .create_table(create_request, bytes::Bytes::from(ipc_data))
+            .await
+            .unwrap();
+
+        // Re-open the same root with the manifest enabled (default). The table
+        // is visible via directory listing but absent from `__manifest`.
+        let namespace = DirectoryNamespaceBuilder::new(root).build().await.unwrap();
+        let mut exists_request = TableExistsRequest::new();
+        exists_request.id = Some(vec!["dir_only_table".to_string()]);
+        assert!(namespace.table_exists(exists_request.clone()).await.is_ok());
+
+        // The fix: dropping must succeed by falling back to a directory-based
+        // drop instead of failing with `TableNotFound`.
+        let mut drop_request = DropTableRequest::new();
+        drop_request.id = Some(vec!["dir_only_table".to_string()]);
+        let response = namespace.drop_table(drop_request).await.unwrap();
+        assert!(response.location.is_some());
+
+        // The table directory is gone afterwards.
         assert!(namespace.table_exists(exists_request).await.is_err());
     }
 
