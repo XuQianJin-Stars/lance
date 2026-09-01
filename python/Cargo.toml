@@ -107,3 +107,8 @@ incremental = false
 
 [lints.clippy]
 disallowed_macros = "deny"
+
+# Override the crates.io `goosefs-sdk` dependency (pulled in transitively via
+# `opendal-service-goosefs`) with Tencent's public main branch.
+[patch.crates-io]
+goosefs-sdk = { git = "https://github.com/Tencent/tencent-goosefs-rust-sdk.git", branch = "main" }
