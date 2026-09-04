@@ -15,7 +15,6 @@ rust-version.workspace = true
 
 object_store = { workspace = true }
 opendal = { workspace = true, optional = true }
-object_store_opendal = { workspace = true, optional = true }
 lance-core.workspace = true
 lance-namespace.workspace = true
 arrow = { workspace = true, features = ["ffi"] }
@@ -76,19 +75,18 @@ gcp = [
     "object_store/gcp",
     "dep:opendal",
     "opendal/services-gcs",
-    "dep:object_store_opendal",
     "dep:reqsign-core",
     "dep:reqsign-file-read-tokio",
     "dep:reqsign-google",
     "dep:serde_json",
 ]
-aws = ["object_store/aws", "dep:aws-config", "dep:aws-credential-types", "dep:opendal", "opendal/services-s3", "dep:object_store_opendal"]
-azure = ["object_store/azure", "dep:opendal", "opendal/services-azblob", "opendal/services-azdls", "dep:object_store_opendal"]
-oss = ["dep:opendal", "opendal/services-oss", "dep:object_store_opendal"]
-goosefs = ["dep:opendal", "opendal/services-goosefs", "dep:object_store_opendal"]
-tencent = ["dep:opendal", "opendal/services-cos", "dep:object_store_opendal"]
-huggingface = ["dep:opendal", "opendal/services-huggingface", "dep:object_store_opendal"]
-tos = ["dep:opendal", "opendal/services-tos", "dep:object_store_opendal"]
+aws = ["object_store/aws", "dep:aws-config", "dep:aws-credential-types", "dep:opendal", "opendal/services-s3"]
+azure = ["object_store/azure", "dep:opendal", "opendal/services-azblob", "opendal/services-azdls"]
+oss = ["dep:opendal", "opendal/services-oss"]
+goosefs = ["dep:opendal", "opendal/services-goosefs"]
+tencent = ["dep:opendal", "opendal/services-cos"]
+huggingface = ["dep:opendal", "opendal/services-huggingface"]
+tos = ["dep:opendal", "opendal/services-tos"]
 tos-test = ["tos"]
 test-util = []
 
