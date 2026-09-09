@@ -80,7 +80,7 @@ strip = true
 [lints.clippy]
 disallowed_macros = "deny"
 
-# Override the crates.io `goosefs-sdk` dependency (pulled in transitively via
-# `opendal-service-goosefs`) with Tencent's public main branch.
+# See root Cargo.toml: OpenDAL still requires goosefs-sdk ^0.1.9, so git main
+# 0.2.1 cannot be patched in directly.
 [patch.crates-io]
-goosefs-sdk = { git = "https://github.com/Tencent/tencent-goosefs-rust-sdk.git", branch = "main" }
+goosefs-sdk = { path = "../../third_party/goosefs-sdk-opendal-compat" }
