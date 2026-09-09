@@ -177,10 +177,11 @@ moka = { version = "0.12", features = ["future", "sync"] }
 ndarray = { version = "0.16.1", features = ["matrixmultiply-threading"] }
 num-traits = "0.2"
 object_store = { version = "0.13.2" }
-# Track Apache OpenDAL main. object_store_opendal from that branch
-# implements object_store 0.14, which cannot share types with DataFusion 54
-# (object_store 0.13), so lance-io adapts Operator directly.
-opendal = { git = "https://github.com/apache/opendal.git", branch = "main" }
+# Track the GooseFS goosefs-sdk 0.2 bump until it lands on apache/opendal
+# main. object_store_opendal from that branch implements object_store 0.14,
+# which cannot share types with DataFusion 54 (object_store 0.13), so
+# lance-io adapts Operator directly.
+opendal = { git = "https://github.com/XuQianJin-Stars/opendal.git", branch = "chore/goosefs-sdk-0.2" }
 parquet = { version = "58.0.0", default-features = false, features = [
     "arrow",
     "async",
@@ -278,8 +279,7 @@ single_range_in_vec_init = "allow"
 large_futures = "deny"
 disallowed_macros = "deny"
 
-# Apache OpenDAL still depends on `goosefs-sdk = "0.1.9"` (`^0.1.9` → <0.2.0).
-# Tencent main is 0.2.1, so a direct git patch of that crate is unused by Cargo.
-# The compat crate reports 0.1.9 and re-exports git main (0.2.x).
+# Override crates.io `goosefs-sdk` with Tencent main. This matches because
+# OpenDAL on `chore/goosefs-sdk-0.2` depends on `goosefs-sdk = "0.2"`.
 [patch.crates-io]
-goosefs-sdk = { path = "third_party/goosefs-sdk-opendal-compat" }
+goosefs-sdk = { git = "https://github.com/Tencent/tencent-goosefs-rust-sdk.git", branch = "main" }

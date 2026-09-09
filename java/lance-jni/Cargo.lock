@@ -445,6 +445,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "asyncband"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e52766975a4f080528a898235c51e82e65df9db713419067b5368040eeb5659"
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2576,7 +2582,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5349a61af676b3275bfef7a5fceceeadf6b0a7dd9ec14ba0edd78e1ff771d101"
 dependencies = [
  "anyhow",
- "asyncband",
+ "asyncband 0.6.7",
  "bitflags",
  "datasketches",
  "equivalent",
@@ -2958,13 +2964,6 @@ dependencies = [
  "futures-core",
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "goosefs-sdk"
-version = "0.1.9"
-dependencies = [
- "goosefs-sdk 0.2.1",
 ]
 
 [[package]]
@@ -5118,8 +5117,8 @@ checksum = "269bca4c2591a28585d6bf10d9ed0332b7d76900a1b02bec41bdc3a2cdcda107"
 
 [[package]]
 name = "opendal"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "ctor",
  "opendal-core",
@@ -5141,11 +5140,11 @@ dependencies = [
 
 [[package]]
 name = "opendal-core"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "anyhow",
- "asyncband",
+ "asyncband 0.7.1",
  "base64 0.23.0",
  "bytes",
  "futures",
@@ -5166,8 +5165,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-http-transport-reqwest"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "bytes",
  "futures",
@@ -5179,10 +5178,10 @@ dependencies = [
 
 [[package]]
 name = "opendal-layer-concurrent-limit"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
- "asyncband",
+ "asyncband 0.7.1",
  "futures",
  "http 1.4.2",
  "opendal-core",
@@ -5190,8 +5189,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-layer-logging"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "log",
  "opendal-core",
@@ -5199,8 +5198,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-layer-retry"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "backon",
  "log",
@@ -5209,8 +5208,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-layer-timeout"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "opendal-core",
  "tokio",
@@ -5218,8 +5217,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-azblob"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "base64 0.23.0",
  "bytes",
@@ -5238,10 +5237,10 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-azdls"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
- "asyncband",
+ "asyncband 0.7.1",
  "base64 0.23.0",
  "bytes",
  "http 1.4.2",
@@ -5258,8 +5257,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-azure-common"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "http 1.4.2",
  "opendal-core",
@@ -5267,8 +5266,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-cos"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "bytes",
  "http 1.4.2",
@@ -5283,8 +5282,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-gcs"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "async-trait",
  "bytes",
@@ -5304,23 +5303,23 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-goosefs"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
+ "asyncband 0.7.1",
  "bytes",
- "goosefs-sdk 0.1.9",
+ "goosefs-sdk",
  "log",
  "opendal-core",
  "serde",
- "tokio",
 ]
 
 [[package]]
 name = "opendal-service-hf"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
- "asyncband",
+ "asyncband 0.7.1",
  "bytes",
  "hf-xet",
  "http 1.4.2",
@@ -5333,8 +5332,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-oss"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "bytes",
  "http 1.4.2",
@@ -5349,8 +5348,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-s3"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "base64 0.23.0",
  "bytes",
@@ -5369,8 +5368,8 @@ dependencies = [
 
 [[package]]
 name = "opendal-service-tos"
-version = "0.59.0"
-source = "git+https://github.com/apache/opendal.git?branch=main#54b33a16284da7c781824474cc1555e5ee379a51"
+version = "0.59.1"
+source = "git+https://github.com/XuQianJin-Stars/opendal.git?branch=chore%2Fgoosefs-sdk-0.2#9267a5d705792f578272ee2ca606c5c88c25f76a"
 dependencies = [
  "bytes",
  "http 1.4.2",
@@ -5785,7 +5784,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
 dependencies = [
  "heck",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "petgraph",
@@ -5804,7 +5803,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
