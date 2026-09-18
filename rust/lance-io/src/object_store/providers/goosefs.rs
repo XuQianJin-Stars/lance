@@ -523,7 +523,6 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::object_store::StorageOptionsAccessor;
     use rstest::rstest;
     use serial_test::serial;
     use std::ffi::OsString;
@@ -602,22 +601,6 @@ mod tests {
         assert_eq!(path.to_string(), "dir/with space/f.lance");
     }
 
-    #[test]
-    fn test_calculate_object_store_prefix_default_root() {
-        let provider = GooseFsStoreProvider;
-        let url = Url::parse("goosefs://10.0.0.1:9200/data").unwrap();
-        let prefix = provider.calculate_object_store_prefix(&url, None).unwrap();
-        assert_eq!(prefix, "goosefs$10.0.0.1:9200");
-    }
-
-    #[test]
-    fn test_calculate_object_store_prefix_with_hostname() {
-        let provider = GooseFsStoreProvider;
-        let url = Url::parse("goosefs://myhost:9200/data").unwrap();
-        let prefix = provider.calculate_object_store_prefix(&url, None).unwrap();
-        assert_eq!(prefix, "goosefs$myhost:9200");
-    }
-
     /// Regression test: two URLs pointing at different datasets under the
     /// same master must produce the *same* cache prefix so they share one
     /// Operator, and correctness must come from `extract_path` returning
@@ -676,126 +659,71 @@ mod tests {
         assert_ne!(default_prefix, custom_prefix);
     }
 
-    #[test]
-    fn test_resolve_master_addr_from_url() {
-        let url = Url::parse("goosefs://10.0.0.1:9200/data").unwrap();
-        let storage_options = StorageOptions(HashMap::new());
-        let addr = GooseFsStoreProvider::resolve_master_addr(&url, &storage_options).unwrap();
-        assert_eq!(addr, "10.0.0.1:9200");
+    fn master_option_map(addr: Option<&str>) -> Option<HashMap<String, String>> {
+        addr.map(|addr| HashMap::from([("goosefs_master_addr".to_string(), addr.to_string())]))
     }
 
-    #[test]
-    fn test_resolve_master_addr_default_port() {
-        let url = Url::parse("goosefs://10.0.0.1/data").unwrap();
-        let storage_options = StorageOptions(HashMap::new());
-        let addr = GooseFsStoreProvider::resolve_master_addr(&url, &storage_options).unwrap();
-        assert_eq!(addr, "10.0.0.1:9200");
-    }
-
-    #[test]
-    fn test_resolve_master_addr_from_storage_options() {
-        let url = Url::parse("goosefs://10.0.0.1:9200/data").unwrap();
-        let storage_options = StorageOptions(HashMap::from([(
-            "goosefs_master_addr".to_string(),
-            "10.0.0.2:9200,10.0.0.3:9200".to_string(),
-        )]));
-        let addr = GooseFsStoreProvider::resolve_master_addr(&url, &storage_options).unwrap();
-        assert_eq!(addr, "10.0.0.2:9200,10.0.0.3:9200");
-    }
-
-    #[test]
-    fn test_resolve_master_addr_hostless_url_from_storage_options() {
-        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
-        let storage_options = StorageOptions(HashMap::from([(
-            "goosefs_master_addr".to_string(),
-            "10.0.0.2:9200".to_string(),
-        )]));
-        let addr = GooseFsStoreProvider::resolve_master_addr(&url, &storage_options).unwrap();
-        assert_eq!(addr, "10.0.0.2:9200");
-    }
-
-    /// `goosefs:///path` must not be rejected in Lance: OpenDAL still loads
-    /// masters from `goosefs-site.properties` when this returns `None`.
-    #[test]
+    #[rstest]
+    #[case::from_url("goosefs://10.0.0.1:9200/data", None, Some("10.0.0.1:9200"))]
+    #[case::default_port("goosefs://10.0.0.1/data", None, Some("10.0.0.1:9200"))]
+    #[case::storage_options(
+        "goosefs://10.0.0.1:9200/data",
+        Some("10.0.0.2:9200,10.0.0.3:9200"),
+        Some("10.0.0.2:9200,10.0.0.3:9200")
+    )]
+    #[case::hostless_with_option(
+        "goosefs:///data/foo.lance",
+        Some("10.0.0.2:9200"),
+        Some("10.0.0.2:9200")
+    )]
+    #[case::hostless_none("goosefs:///data/foo.lance", None, None)]
     #[serial]
-    fn test_resolve_master_addr_hostless_url_without_explicit_source() {
+    fn test_resolve_master_addr(
+        #[case] uri: &str,
+        #[case] master_option: Option<&str>,
+        #[case] expected: Option<&str>,
+    ) {
         let _clear_env = RestoreEnv::unset("GOOSEFS_MASTER_ADDR");
-        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
-        let storage_options = StorageOptions(HashMap::new());
+        let url = Url::parse(uri).unwrap();
+        let storage_options = StorageOptions(master_option_map(master_option).unwrap_or_default());
         assert_eq!(
-            GooseFsStoreProvider::resolve_master_addr(&url, &storage_options),
-            None
+            GooseFsStoreProvider::resolve_master_addr(&url, &storage_options).as_deref(),
+            expected
         );
     }
 
-    #[test]
+    #[rstest]
+    #[case::from_url("goosefs://10.0.0.1:9200/data", None, "goosefs$10.0.0.1:9200")]
+    #[case::hostname("goosefs://myhost:9200/data", None, "goosefs$myhost:9200")]
+    #[case::hostless("goosefs:///data/foo.lance", None, "goosefs$")]
+    #[case::hostless_option(
+        "goosefs:///data/foo.lance",
+        Some("10.0.0.1:9200"),
+        "goosefs$10.0.0.1:9200"
+    )]
+    #[case::authority_overridden(
+        "goosefs://placeholder:9200/data/foo.lance",
+        Some("10.0.0.1:9200"),
+        "goosefs$10.0.0.1:9200"
+    )]
+    #[case::authority_overridden_other_master(
+        "goosefs://placeholder:9200/data/foo.lance",
+        Some("10.0.0.2:9200"),
+        "goosefs$10.0.0.2:9200"
+    )]
     #[serial]
-    fn test_calculate_object_store_prefix_hostless_url() {
+    fn test_calculate_object_store_prefix(
+        #[case] uri: &str,
+        #[case] master_option: Option<&str>,
+        #[case] expected: &str,
+    ) {
         let _clear_env = RestoreEnv::unset("GOOSEFS_MASTER_ADDR");
-        let provider = GooseFsStoreProvider;
-        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
-        let prefix = provider.calculate_object_store_prefix(&url, None).unwrap();
-        assert_eq!(prefix, "goosefs$");
-    }
-
-    #[test]
-    fn test_calculate_object_store_prefix_hostless_url_with_master_option() {
-        let provider = GooseFsStoreProvider;
-        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
-        let opts = HashMap::from([(
-            "goosefs_master_addr".to_string(),
-            "10.0.0.1:9200".to_string(),
-        )]);
-        let prefix = provider
-            .calculate_object_store_prefix(&url, Some(&opts))
+        let url = Url::parse(uri).unwrap();
+        let opts = master_option_map(master_option);
+        let prefix = GooseFsStoreProvider
+            .calculate_object_store_prefix(&url, opts.as_ref())
             .unwrap();
-        assert_eq!(prefix, "goosefs$10.0.0.1:9200");
-    }
-
-    /// Regression test (review feedback): the prefix must be derived from the
-    /// resolved master, not the raw URL authority, even when the URL carries
-    /// an authority. Otherwise two URLs sharing a placeholder authority but
-    /// pointing at different masters via `goosefs_master_addr` would collide
-    /// on one cached Operator while OpenDAL connects to different masters.
-    #[test]
-    fn test_prefix_authority_url_with_master_option_override() {
-        let provider = GooseFsStoreProvider;
-        let url = Url::parse("goosefs://placeholder:9200/data/foo.lance").unwrap();
-        let opts_a = HashMap::from([(
-            "goosefs_master_addr".to_string(),
-            "10.0.0.1:9200".to_string(),
-        )]);
-        let opts_b = HashMap::from([(
-            "goosefs_master_addr".to_string(),
-            "10.0.0.2:9200".to_string(),
-        )]);
-
-        let pa = provider
-            .calculate_object_store_prefix(&url, Some(&opts_a))
-            .unwrap();
-        let pb = provider
-            .calculate_object_store_prefix(&url, Some(&opts_b))
-            .unwrap();
-        assert_eq!(pa, "goosefs$10.0.0.1:9200");
-        assert_eq!(pb, "goosefs$10.0.0.2:9200");
-        assert_ne!(pa, pb, "different masters must not share a cache entry");
-    }
-
-    #[tokio::test]
-    async fn test_new_store_hostless_url_with_storage_options() {
-        let provider = GooseFsStoreProvider;
-        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
-        let params = ObjectStoreParams {
-            storage_options_accessor: Some(Arc::new(StorageOptionsAccessor::with_static_options(
-                HashMap::from([(
-                    "goosefs_master_addr".to_string(),
-                    "10.0.0.1:9200".to_string(),
-                )]),
-            ))),
-            ..Default::default()
-        };
-        let store = provider.new_store(url, &params).await.unwrap();
-        assert_eq!(store.scheme, "goosefs");
+        assert_eq!(prefix, expected);
     }
 
     /// Regression: a Hadoop-style `goosefs:///path` URL plus
