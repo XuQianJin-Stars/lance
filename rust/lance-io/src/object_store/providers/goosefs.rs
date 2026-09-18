@@ -490,18 +490,19 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
     /// Calculate the object store prefix used as the registry cache key.
     ///
     /// Format: `goosefs$master_addr`. The address is derived through the same
-    /// [`Self::resolve_master_addr`] chain that `new_store` feeds to OpenDAL
-    /// as `master_addr`, so the prefix always tracks the master the Operator
-    /// actually uses — including when `goosefs_master_addr` /
-    /// `GOOSEFS_MASTER_ADDR` overrides the URL authority, and for hostless
-    /// URLs such as `goosefs:///path`. When nothing resolves (the master
-    /// comes only from `goosefs-site.properties`), the prefix stays
-    /// `goosefs$` — that file is process-wide, so one cached Operator is
-    /// correct. Because the OpenDAL root is cluster-wide (not per-URL), all
-    /// datasets under the same master intentionally share the same cached
-    /// [`ObjectStore`]; the URL path is disambiguated by
-    /// [`Self::extract_path`] on each request. This is analogous to how two
-    /// `s3://bucket/a` and `s3://bucket/b` URLs share one store.
+    /// chain that [`Self::new_store`] feeds to OpenDAL as `master_addr`
+    /// (`goosefs_master_addr`, then `GOOSEFS_MASTER_ADDR`, then the URL
+    /// authority), so the prefix always tracks the master the Operator
+    /// actually uses — including when those options override the URL
+    /// authority, and for hostless URLs such as `goosefs:///path`. When
+    /// nothing resolves (the master comes only from
+    /// `goosefs-site.properties`), the prefix stays `goosefs$` — that file
+    /// is process-wide, so one cached Operator is correct. Because the
+    /// OpenDAL root is cluster-wide (not per-URL), all datasets under the
+    /// same master intentionally share the same cached [`ObjectStore`]; the
+    /// URL path is disambiguated by [`Self::extract_path`] on each request.
+    /// This is analogous to how two `s3://bucket/a` and `s3://bucket/b`
+    /// URLs share one store.
     fn calculate_object_store_prefix(
         &self,
         url: &Url,
