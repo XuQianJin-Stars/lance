@@ -489,11 +489,19 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
 
     /// Calculate the object store prefix used as the registry cache key.
     ///
-    /// Format: `goosefs$host:port`. Because the OpenDAL root is now cluster-
-    /// wide (not per-URL), all datasets under the same master intentionally
-    /// share the same cached [`ObjectStore`]; the URL path is disambiguated
-    /// by [`Self::extract_path`] on each request. This is analogous to how
-    /// two `s3://bucket/a` and `s3://bucket/b` URLs share one store.
+    /// Format: `goosefs$master_addr`. The address is derived through the same
+    /// [`Self::resolve_master_addr`] chain that `new_store` feeds to OpenDAL
+    /// as `master_addr`, so the prefix always tracks the master the Operator
+    /// actually uses — including when `goosefs_master_addr` /
+    /// `GOOSEFS_MASTER_ADDR` overrides the URL authority, and for hostless
+    /// URLs such as `goosefs:///path`. When nothing resolves (the master
+    /// comes only from `goosefs-site.properties`), the prefix stays
+    /// `goosefs$` — that file is process-wide, so one cached Operator is
+    /// correct. Because the OpenDAL root is cluster-wide (not per-URL), all
+    /// datasets under the same master intentionally share the same cached
+    /// [`ObjectStore`]; the URL path is disambiguated by
+    /// [`Self::extract_path`] on each request. This is analogous to how two
+    /// `s3://bucket/a` and `s3://bucket/b` URLs share one store.
     fn calculate_object_store_prefix(
         &self,
         url: &Url,
@@ -502,18 +510,8 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
         // If a custom `goosefs_root` is provided, include it in the prefix so
         // that stores built with different roots don't accidentally collide.
         let opts = StorageOptions(storage_options.cloned().unwrap_or_default());
+        let authority = Self::resolve_master_addr(url, &opts).unwrap_or_default();
         let root = Self::resolve_root(&opts);
-        // `goosefs:///path` has an empty authority. Use the resolved master
-        // when present so two host-less URLs with different
-        // `goosefs_master_addr` options do not share a cache entry. When the
-        // master comes only from `goosefs-site.properties`, the prefix stays
-        // `goosefs$` — that file is process-wide, so one cached Operator is
-        // correct.
-        let authority = if url.authority().is_empty() {
-            Self::resolve_master_addr(url, &opts).unwrap_or_default()
-        } else {
-            url.authority().to_string()
-        };
         if root == "/" {
             Ok(format!("{}${}", url.scheme(), authority))
         } else {
@@ -752,6 +750,35 @@ mod tests {
             .calculate_object_store_prefix(&url, Some(&opts))
             .unwrap();
         assert_eq!(prefix, "goosefs$10.0.0.1:9200");
+    }
+
+    /// Regression test (review feedback): the prefix must be derived from the
+    /// resolved master, not the raw URL authority, even when the URL carries
+    /// an authority. Otherwise two URLs sharing a placeholder authority but
+    /// pointing at different masters via `goosefs_master_addr` would collide
+    /// on one cached Operator while OpenDAL connects to different masters.
+    #[test]
+    fn test_prefix_authority_url_with_master_option_override() {
+        let provider = GooseFsStoreProvider;
+        let url = Url::parse("goosefs://placeholder:9200/data/foo.lance").unwrap();
+        let opts_a = HashMap::from([(
+            "goosefs_master_addr".to_string(),
+            "10.0.0.1:9200".to_string(),
+        )]);
+        let opts_b = HashMap::from([(
+            "goosefs_master_addr".to_string(),
+            "10.0.0.2:9200".to_string(),
+        )]);
+
+        let pa = provider
+            .calculate_object_store_prefix(&url, Some(&opts_a))
+            .unwrap();
+        let pb = provider
+            .calculate_object_store_prefix(&url, Some(&opts_b))
+            .unwrap();
+        assert_eq!(pa, "goosefs$10.0.0.1:9200");
+        assert_eq!(pb, "goosefs$10.0.0.2:9200");
+        assert_ne!(pa, pb, "different masters must not share a cache entry");
     }
 
     #[tokio::test]
