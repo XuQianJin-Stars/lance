@@ -34,10 +34,12 @@ const STORAGE_OPTION_KEYS: &[&str] = &[
 /// GooseFS object store provider.
 ///
 /// Uses OpenDAL's GooseFs service to access GooseFS via gRPC.
-/// URL format: `goosefs://host:port/path`
+/// URL format: `goosefs://host:port/path` or `goosefs:///path`.
 ///
 /// Where:
-/// - `host:port` is the GooseFS Master address (default port: 9200)
+/// - `host:port` is the GooseFS Master address (default port: 9200). It may
+///   be omitted (`goosefs:///path`) when the master is supplied by
+///   `storage_options`, `GOOSEFS_MASTER_ADDR`, or `goosefs-site.properties`.
 /// - `/path` is the filesystem path within GooseFS
 ///
 /// Path handling model (S3-style):
@@ -53,6 +55,9 @@ const STORAGE_OPTION_KEYS: &[&str] = &[
 ///
 /// Supported configuration keys (via `storage_options` or environment variables,
 /// resolved with priority: `storage_options` > env var > URL authority > default).
+/// Master address is the exception: OpenDAL/SDK apply
+/// `GOOSEFS_MASTER_ADDR` > `goosefs-site.properties` > `master_addr`
+/// (the latter is filled from `storage_options` or the URL authority).
 /// `storage_options` keys must be lowercase; uppercase/mixed-case spellings are
 /// rejected rather than silently ignored.
 ///
@@ -131,38 +136,44 @@ impl GooseFsStoreProvider {
         )))
     }
 
-    /// Resolve the GooseFS Master address from storage_options, environment, or URL.
+    /// Resolve an explicit GooseFS Master address for OpenDAL's `master_addr`.
     ///
-    /// Priority:
+    /// Returns `None` when neither `storage_options`, `GOOSEFS_MASTER_ADDR`, nor
+    /// the URL authority supplies an address. Callers must omit `master_addr`
+    /// from the OpenDAL config in that case so the SDK can still load masters
+    /// from `goosefs-site.properties`. Requiring a host here would reject
+    /// Hadoop-style `goosefs:///path` URLs before OpenDAL runs.
+    ///
+    /// Priority among the sources this function *does* consult:
     /// 1. `storage_options["goosefs_master_addr"]` (supports HA: "addr1:port,addr2:port")
     /// 2. `GOOSEFS_MASTER_ADDR` environment variable
     /// 3. URL authority (host:port from the URL)
-    fn resolve_master_addr(url: &Url, storage_options: &StorageOptions) -> Result<String> {
+    ///
+    /// OpenDAL then applies `GOOSEFS_MASTER_ADDR` > `goosefs-site.properties` >
+    /// this `master_addr` value, so a deployed site file can still supply the
+    /// HA master list that a single URI authority cannot express.
+    fn resolve_master_addr(url: &Url, storage_options: &StorageOptions) -> Option<String> {
         // 1. storage_options
         if let Some(addr) = storage_options
             .0
             .get("goosefs_master_addr")
             .filter(|v| !v.is_empty())
         {
-            return Ok(addr.clone());
+            return Some(addr.clone());
         }
 
         // 2. Environment variable
         if let Ok(addr) = std::env::var("GOOSEFS_MASTER_ADDR")
             && !addr.is_empty()
         {
-            return Ok(addr);
+            return Some(addr);
         }
 
-        // 3. URL authority
-        let host = url.host_str().ok_or_else(|| {
-            Error::invalid_input(
-                "GooseFS URL must contain a master address (host), e.g. goosefs://host:port/path",
-            )
-        })?;
-
+        // 3. URL authority. Empty host (`goosefs:///path`) is valid: OpenDAL
+        //    will resolve the master from `goosefs-site.properties`.
+        let host = url.host_str()?;
         let port = url.port().unwrap_or(DEFAULT_GOOSEFS_PORT);
-        Ok(format!("{}:{}", host, port))
+        Some(format!("{}:{}", host, port))
     }
 
     /// Resolve a storage option from storage_options or environment variable.
@@ -389,8 +400,10 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
 
         Self::validate_storage_option_keys(&storage_options)?;
 
-        // Resolve master address
-        let master_addr = Self::resolve_master_addr(&base_path, &storage_options)?;
+        // Resolve master address. Omit the OpenDAL key when unset so the SDK
+        // can still read `goosefs-site.properties` (and OpenDAL can still
+        // reject the build if no source at all supplies a master).
+        let master_addr = Self::resolve_master_addr(&base_path, &storage_options);
 
         // Resolve a stable cluster-wide root. The URL path is *not* used here
         // because it varies per dataset; per-request keys are supplied by
@@ -399,7 +412,9 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
 
         // Build OpenDAL config map
         let mut config_map: HashMap<String, String> = HashMap::new();
-        config_map.insert("master_addr".to_string(), master_addr);
+        if let Some(master_addr) = master_addr {
+            config_map.insert("master_addr".to_string(), master_addr);
+        }
         config_map.insert("root".to_string(), root);
 
         // Optional: write_type
@@ -488,10 +503,21 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
         // that stores built with different roots don't accidentally collide.
         let opts = StorageOptions(storage_options.cloned().unwrap_or_default());
         let root = Self::resolve_root(&opts);
-        if root == "/" {
-            Ok(format!("{}${}", url.scheme(), url.authority()))
+        // `goosefs:///path` has an empty authority. Use the resolved master
+        // when present so two host-less URLs with different
+        // `goosefs_master_addr` options do not share a cache entry. When the
+        // master comes only from `goosefs-site.properties`, the prefix stays
+        // `goosefs$` — that file is process-wide, so one cached Operator is
+        // correct.
+        let authority = if url.authority().is_empty() {
+            Self::resolve_master_addr(url, &opts).unwrap_or_default()
         } else {
-            Ok(format!("{}${}#{}", url.scheme(), url.authority(), root))
+            url.authority().to_string()
+        };
+        if root == "/" {
+            Ok(format!("{}${}", url.scheme(), authority))
+        } else {
+            Ok(format!("{}${}#{}", url.scheme(), authority, root))
         }
     }
 }
@@ -499,12 +525,55 @@ impl ObjectStoreProvider for GooseFsStoreProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::object_store::StorageOptionsAccessor;
     use rstest::rstest;
+    use serial_test::serial;
+    use std::ffi::OsString;
+
+    /// Restore an environment variable when dropped so tests that mutate
+    /// `GOOSEFS_*` cannot leak into later cases.
+    struct RestoreEnv {
+        key: &'static str,
+        original: Option<OsString>,
+    }
+
+    impl RestoreEnv {
+        fn unset(key: &'static str) -> Self {
+            let original = std::env::var_os(key);
+            unsafe { std::env::remove_var(key) };
+            Self { key, original }
+        }
+
+        fn set(key: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
+            let original = std::env::var_os(key);
+            unsafe { std::env::set_var(key, value) };
+            Self { key, original }
+        }
+    }
+
+    impl Drop for RestoreEnv {
+        fn drop(&mut self) {
+            unsafe {
+                match &self.original {
+                    Some(value) => std::env::set_var(self.key, value),
+                    None => std::env::remove_var(self.key),
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_goosefs_extract_path_basic() {
         let provider = GooseFsStoreProvider;
         let url = Url::parse("goosefs://10.0.0.1:9200/data/embeddings.lance").unwrap();
+        let path = provider.extract_path(&url).unwrap();
+        assert_eq!(path.to_string(), "data/embeddings.lance");
+    }
+
+    #[test]
+    fn test_goosefs_extract_path_hostless_url() {
+        let provider = GooseFsStoreProvider;
+        let url = Url::parse("goosefs:///data/embeddings.lance").unwrap();
         let path = provider.extract_path(&url).unwrap();
         assert_eq!(path.to_string(), "data/embeddings.lance");
     }
@@ -634,6 +703,99 @@ mod tests {
         )]));
         let addr = GooseFsStoreProvider::resolve_master_addr(&url, &storage_options).unwrap();
         assert_eq!(addr, "10.0.0.2:9200,10.0.0.3:9200");
+    }
+
+    #[test]
+    fn test_resolve_master_addr_hostless_url_from_storage_options() {
+        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
+        let storage_options = StorageOptions(HashMap::from([(
+            "goosefs_master_addr".to_string(),
+            "10.0.0.2:9200".to_string(),
+        )]));
+        let addr = GooseFsStoreProvider::resolve_master_addr(&url, &storage_options).unwrap();
+        assert_eq!(addr, "10.0.0.2:9200");
+    }
+
+    /// `goosefs:///path` must not be rejected in Lance: OpenDAL still loads
+    /// masters from `goosefs-site.properties` when this returns `None`.
+    #[test]
+    #[serial]
+    fn test_resolve_master_addr_hostless_url_without_explicit_source() {
+        let _clear_env = RestoreEnv::unset("GOOSEFS_MASTER_ADDR");
+        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
+        let storage_options = StorageOptions(HashMap::new());
+        assert_eq!(
+            GooseFsStoreProvider::resolve_master_addr(&url, &storage_options),
+            None
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_calculate_object_store_prefix_hostless_url() {
+        let _clear_env = RestoreEnv::unset("GOOSEFS_MASTER_ADDR");
+        let provider = GooseFsStoreProvider;
+        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
+        let prefix = provider.calculate_object_store_prefix(&url, None).unwrap();
+        assert_eq!(prefix, "goosefs$");
+    }
+
+    #[test]
+    fn test_calculate_object_store_prefix_hostless_url_with_master_option() {
+        let provider = GooseFsStoreProvider;
+        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
+        let opts = HashMap::from([(
+            "goosefs_master_addr".to_string(),
+            "10.0.0.1:9200".to_string(),
+        )]);
+        let prefix = provider
+            .calculate_object_store_prefix(&url, Some(&opts))
+            .unwrap();
+        assert_eq!(prefix, "goosefs$10.0.0.1:9200");
+    }
+
+    #[tokio::test]
+    async fn test_new_store_hostless_url_with_storage_options() {
+        let provider = GooseFsStoreProvider;
+        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
+        let params = ObjectStoreParams {
+            storage_options_accessor: Some(Arc::new(StorageOptionsAccessor::with_static_options(
+                HashMap::from([(
+                    "goosefs_master_addr".to_string(),
+                    "10.0.0.1:9200".to_string(),
+                )]),
+            ))),
+            ..Default::default()
+        };
+        let store = provider.new_store(url, &params).await.unwrap();
+        assert_eq!(store.scheme, "goosefs");
+    }
+
+    /// Regression: a Hadoop-style `goosefs:///path` URL plus
+    /// `goosefs-site.properties` must build an Operator. The previous
+    /// `resolve_master_addr` required a URL host and rejected this before
+    /// OpenDAL could read the site file.
+    #[tokio::test]
+    #[serial]
+    async fn test_new_store_hostless_url_uses_site_properties() {
+        let dir = tempfile::tempdir().unwrap();
+        let site = dir.path().join("goosefs-site.properties");
+        std::fs::write(
+            &site,
+            "goosefs.master.hostname=10.0.0.1\ngoosefs.master.rpc.port=9200\n",
+        )
+        .unwrap();
+
+        let _config_file = RestoreEnv::set("GOOSEFS_CONFIG_FILE", &site);
+        let _clear_addr = RestoreEnv::unset("GOOSEFS_MASTER_ADDR");
+
+        let provider = GooseFsStoreProvider;
+        let url = Url::parse("goosefs:///data/foo.lance").unwrap();
+        let store = provider
+            .new_store(url, &ObjectStoreParams::default())
+            .await
+            .unwrap();
+        assert_eq!(store.scheme, "goosefs");
     }
 
     #[test]
